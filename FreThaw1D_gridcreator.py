@@ -9,13 +9,12 @@ This is used to create the grid for FreThaw1D model.
 """
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 from matplotlib import rc
 from scipy.interpolate import interp1d
 from netCDF4 import Dataset
 
 def grid1D(data_grid, dz_min, b, grid_type):
-	'''
+    '''
     This function creates the geometry of 1D grid for a finite volume numerical.     
     
     :param data_grid: pandas dataframe containg the grid_input_file.csv
@@ -28,7 +27,7 @@ def grid1D(data_grid, dz_min, b, grid_type):
     :type b: float
 
     :param grid_type: type of the grid. The grid can be created using picewise mesh spacing, classical, or an exponential function, exponential
-	
+    
     return:
     
     KMAX: number of control volumes
@@ -48,54 +47,54 @@ def grid1D(data_grid, dz_min, b, grid_type):
     type z: array
 
     z_dual: vertical coordinate of control volumes interfaces positive upward with origin set at soil column bottom. 
-    type zDual: array		
+    type zDual: array        
         
     '''
-	if(grid_type=='classical'):
-		return build_grid(data_grid)
-	elif(grid_type=='exponential'):
-		return build_grid_exponential(data_grid, dz_min, b)
-	else:
-		print('Check grid_type')
-		
+    if(grid_type=='classical'):
+        return build_grid(data_grid)
+    elif(grid_type=='exponential'):
+        return build_grid_exponential(data_grid, dz_min, b)
+    else:
+        print('Check grid_type')
+        
 
 def build_grid(data_grid):
     '''
     This function creates the geometry of 1D grid for a finite volume numerical. The discretizion is 
-	with constant mesh spacing in each layers.
+    with constant mesh spacing in each layers.
     scheme.
     
     
     :param data_grid: pandas dataframe containg the grid_input_file.csv
-	:type data_grid: pandas dataframe
-	
+    :type data_grid: pandas dataframe
+    
 
     return:
     
-	KMAX: number of control volumes
-	type KMAX: int
-	
-	VECTOR_LENGTH: length of the array. This value is equal to NMAX is size_factor 1, suggested whenever there is no need to regrid.
-	type VECTOR_LENGTH: int
-	
+    KMAX: number of control volumes
+    type KMAX: int
+    
+    VECTOR_LENGTH: length of the array. This value is equal to NMAX is size_factor 1, suggested whenever there is no need to regrid.
+    type VECTOR_LENGTH: int
+    
     eta: vertical coordinate of control volumes centroids positive upward with origin set at soil surface.
-	type eta: array
-	
+    type eta: array
+    
     eta_dual: vertical coordinate of control volumes interfaces positive upward with origin set at soil surface.
-	type eta_dual: array
+    type eta_dual: array
 
-	space_delta: is the distance between two adjacent control volumes. 
+    space_delta: is the distance between two adjacent control volumes. 
                 This quantity is used to compute gradients.    
-	type space_delta: array
+    type space_delta: array
     
     z: vertical coordinate of control volumes centroids positive upward with origin set at soil column bottom. This is the spatial coordinate used to to write the equation
-	type z: array
+    type z: array
     
     z_dual: vertical coordinate of control volumes interfaces positive upward with origin set at soil column bottom. 
-	type zDual: array		
-	
+    type zDual: array        
+    
     control_volume: dimension of control volume 
-	type control_volume: array		
+    type control_volume: array        
         
     '''
     # get the number og control volumes
@@ -125,25 +124,25 @@ def build_grid(data_grid):
 
     
     for i in range(np.size(data_grid.index)-1,0,-1):
-		
+        
         if data_grid['Type'][i]=='L' and data_grid['Type'][i-1]=='L':
-			
+            
             deta = ( data_grid['eta'][i]-data_grid['eta'][i-1])/data_grid['K'][i-1]
             tmp_eta=np.append(tmp_eta, np.linspace(data_grid['eta'][i]-deta/2,data_grid['eta'][i-1]+deta/2,num=data_grid['K'][i-1],endpoint=True) )
             tmp_eta_dual=np.append(tmp_eta_dual, np.linspace(data_grid['eta'][i],data_grid['eta'][i-1],num=data_grid['K'][i-1]+1,endpoint=True) )
-			
+            
         elif data_grid['Type'][i]=='L' and data_grid['Type'][i-1]=='M':
-			
+            
             deta = ( data_grid['eta'][i]-data_grid['eta'][i-1])/data_grid['K'][i-1]
             tmp_eta=np.append(tmp_eta, np.linspace(data_grid['eta'][i]-deta/2,data_grid['eta'][i-1],num=data_grid['K'][i-1],endpoint=True) )
             tmp_eta_dual=np.append(tmp_eta_dual, np.linspace(data_grid['eta'][i],data_grid['eta'][i-1]+deta/2,num=data_grid['K'][i-1],endpoint=True) )
-			
+            
         elif data_grid['Type'][i]=='M' and data_grid['Type'][i-1]=='L':
-			
+            
             deta = ( data_grid['eta'][i]-data_grid['eta'][i-1])/data_grid['K'][i-1]
             tmp_eta=np.append(tmp_eta, np.linspace(data_grid['eta'][i],data_grid['eta'][i-1]+deta/2,num=data_grid['K'][i-1],endpoint=True) )
             tmp_eta_dual=np.append(tmp_eta_dual, np.linspace(data_grid['eta'][i]-deta/2,data_grid['eta'][i-1],num=data_grid['K'][i-1],endpoint=True) )
-			
+            
         else:
             print("ERROR!!")  
         
@@ -153,30 +152,30 @@ def build_grid(data_grid):
 
     # move from list to array
     for i in range(0,len(tmp_eta)):
-		
+        
         eta[i] = tmp_eta[i]
         z[i] = tmp_eta[i] - data_grid['eta'][np.size(data_grid['eta'])-1]
         
     for i in range(0,len(tmp_eta_dual)):
-		
+        
         eta_dual[i] = tmp_eta_dual[i]
         z_dual[i] = tmp_eta_dual[i] - data_grid['eta'][np.size(data_grid['eta'])-1]
-		
+        
         if i==0:
-			
+            
             space_delta[i] = np.abs(eta_dual[i]-eta[i])
-			
+            
         elif i==np.size(eta_dual)-1:
-			
+            
             space_delta[i] = np.abs(eta_dual[i]-eta[i-1])
-			
+            
         else:
-			
+            
             space_delta[i] = np.abs(eta[i-1]-eta[i]) 
            
     for i in range(0,len(eta_dual)-1):
-        control_volume[i] = np.abs(eta_dual[i]-eta_dual[i+1])		
-		
+        control_volume[i] = np.abs(eta_dual[i]-eta_dual[i+1])        
+        
     return [KMAX, eta, eta_dual, space_delta, z, z_dual, control_volume]
 
 
@@ -216,10 +215,10 @@ def build_grid_exponential(data_grid, dz_min, b):
     type z: array
 
     z_dual: vertical coordinate of control volumes interfaces positive upward with origin set at soil column bottom. 
-    type zDual: array		
-	
+    type zDual: array        
+    
     control_volume: dimension of control volume 
-	type control_volume: array	
+    type control_volume: array    
         
     '''
   
@@ -263,8 +262,8 @@ def build_grid_exponential(data_grid, dz_min, b):
     space_delta = np.zeros(KMAX+1,dtype=float)
     # array containing control volume size
     control_volume = np.zeros(KMAX,dtype=float)
-	
-	
+    
+    
     tmp = 0
     for i in range(0,KMAX):
         z[i] = dz[KMAX-1-i]/2+tmp
@@ -293,8 +292,8 @@ def build_grid_exponential(data_grid, dz_min, b):
             space_delta[i] = np.abs(eta[i-1]-eta[i]) 
 
     for i in range(0,len(eta_dual)-1):
-        control_volume[i] = np.abs(eta_dual[i]-eta_dual[i+1])	
-		
+        control_volume[i] = np.abs(eta_dual[i]-eta_dual[i+1])    
+        
     return [KMAX, eta, eta_dual, space_delta, z, z_dual, control_volume]
 
 
@@ -362,7 +361,7 @@ def set_parameters(data_grid, data_parameter, KMAX, eta):
     
     regrid_ID:
     type: array
-    	
+        
     soil_particles_density:
     type:array
     
@@ -460,236 +459,307 @@ def set_parameters(data_grid, data_parameter, KMAX, eta):
 
 
 def write_grid_netCDF(eta, eta_dual, z, z_dual, space_delta, soil_volume, ic, rheology_ID, parameter_ID, KMAX, soil_particles_density,              
-					  thermal_conductivity_soil_particles, 
-					  specific_heat_capacity_soil_particles, theta_s, theta_r, melting_temperature, par_1, par_2, par_3, par_4,
-					  output_file_name, output_title, output_institution, output_summary, output_date,
-					  grid_input_file_name, parameter_input_file_name):
-	'''
-	Save all grid data in a NetCDF file
-	
-	:param eta: vertical coordinate of control volume centroids. It is positive upward with.
+                      thermal_conductivity_soil_particles, 
+                      specific_heat_capacity_soil_particles, theta_s, theta_r, melting_temperature, par_1, par_2, par_3, par_4,
+                      output_file_name, output_title, output_institution, output_summary, output_date,
+                      grid_input_file_name, parameter_input_file_name):
+    '''
+    Save all grid data in a NetCDF file
+    
+    :param eta: vertical coordinate of control volume centroids. It is positive upward with.
         origin set at soil surface.
-	:type eta: array
-	
-	:param eta_dual: vertical coordinate of control volume interface. It is positive upward with.
+    :type eta: array
+    
+    :param eta_dual: vertical coordinate of control volume interface. It is positive upward with.
         origin set at soil surface.
-	:type eta_dual: array
-	
-	:param z: vertical coordinate of control volume centroids. It is positive upward with.
+    :type eta_dual: array
+    
+    :param z: vertical coordinate of control volume centroids. It is positive upward with.
         origin set at soil column bottom.
-	:type z: array
-	
-	:param z_dual: vertical coordinate of control volume interfaces. It is positive upward with.
+    :type z: array
+    
+    :param z_dual: vertical coordinate of control volume interfaces. It is positive upward with.
         origin set at soil column bottom.
-	:type z_dual: array
-	
-	:param space_delta: is the distance between two adjacent control volumes.
+    :type z_dual: array
+    
+    :param space_delta: is the distance between two adjacent control volumes.
         This quantity is used to compute gradients
-	:type space_delta: array
-	
-	:param soil_volume: soil volume of each control volume.
-	:type soil_volume: array.
-	
-	:param ic: temperature initial condition.
-	:type ic: array.
-	
-	:param rheology_ID: containing a label for each control volume defining the type of the rheology to be used.
-	:type rheology_ID: array.
-	
-	:param parameter_ID: containing a label for each control volume defining the parameter set to be used.
-	:type parameter_ID: array.
-		
-	:param KMAX: number of control volumes.
-	:type KMAX: int.
-		
-	:param soil_particles_density: array containing the soil particles density.
-	:type soil_particles_density: array.
-	
-	:param thermal_conductivity_soil_particles: array containing the thermal conductivity of soil particles.
-	:type thermal_conductivity_soil_particles: array.
-	
-	:param specific_heat_capacity_soil_particles: array containing the specific heat capacity of soil particles.
-	:type specific_heat_capacity_soil_particles: array.
-	
-	:param theta_s: array containing the values of the water content at saturation.
-	:type theta_s: array.
-	
-	:param theta_r: array containing the values of the residual water content.
-	:type theta_r: array.
+    :type space_delta: array
+    
+    :param soil_volume: soil volume of each control volume.
+    :type soil_volume: array.
+    
+    :param ic: temperature initial condition.
+    :type ic: array.
+    
+    :param rheology_ID: containing a label for each control volume defining the type of the rheology to be used.
+    :type rheology_ID: array.
+    
+    :param parameter_ID: containing a label for each control volume defining the parameter set to be used.
+    :type parameter_ID: array.
+        
+    :param KMAX: number of control volumes.
+    :type KMAX: int.
+        
+    :param soil_particles_density: array containing the soil particles density.
+    :type soil_particles_density: array.
+    
+    :param thermal_conductivity_soil_particles: array containing the thermal conductivity of soil particles.
+    :type thermal_conductivity_soil_particles: array.
+    
+    :param specific_heat_capacity_soil_particles: array containing the specific heat capacity of soil particles.
+    :type specific_heat_capacity_soil_particles: array.
+    
+    :param theta_s: array containing the values of the water content at saturation.
+    :type theta_s: array.
+    
+    :param theta_r: array containing the values of the residual water content.
+    :type theta_r: array.
 
-	:param melting_temperature: array containing the melting temperature.
-	:type melting_temperature: array.
-	
-	:param par1: array containing the values of the SFCC parameter.
-	:type par1: array.
-	
-	:param par2: array containing the values of the SFCC parameter.
-	:type par2: array.
-	
-	:param par3: array containing the values of the SFCC parameter.
-	:type par3: array.
-	
-	:param par4: array containing the values of the SFCC parameter.
-	:type par4: array.
+    :param melting_temperature: array containing the melting temperature.
+    :type melting_temperature: array.
+    
+    :param par1: array containing the values of the SFCC parameter.
+    :type par1: array.
+    
+    :param par2: array containing the values of the SFCC parameter.
+    :type par2: array.
+    
+    :param par3: array containing the values of the SFCC parameter.
+    :type par3: array.
+    
+    :param par4: array containing the values of the SFCC parameter.
+    :type par4: array.
 
-	:param output_file_name: 
-	:type output_file_name: str
-	
-	:param output_title: 
-	:type output_title: str
-	
-	:param output_institution: 
-	:type param output_institution: str
-	
-	:param output_summary: 
-	:type output_summary: str
-	
-	:param output_date: 
-	:type output_date: str
-	
-	:param input_file_name: 
-	:type input_file_name: str
-	
-	'''
-	
+    :param output_file_name: 
+    :type output_file_name: str
+    
+    :param output_title: 
+    :type output_title: str
+    
+    :param output_institution: 
+    :type param output_institution: str
+    
+    :param output_summary: 
+    :type output_summary: str
+    
+    :param output_date: 
+    :type output_date: str
+    
+    :param input_file_name: 
+    :type input_file_name: str
+    
+    '''
+    
     # the output array to write will be nx x ny
-	dim = np.size(eta);
-	dim1 = np.size(eta_dual);
-	dim_parameter = np.size(par_1)
-	dim_scalar = 1
-	
-	
+    dim = np.size(eta);
+    dim1 = np.size(eta_dual);
+    dim_parameter = np.size(par_1)
+    dim_scalar = 1
+    
+    
     # open a new netCDF file for writing.
-	ncfile = Dataset(output_file_name,'w') 
-	
+    ncfile = Dataset(output_file_name,'w') 
+    
     # Create global attributes
-	ncfile.title = output_title + '\\n' + 'grid input file' + grid_input_file_name + 'parameter input file' + parameter_input_file_name
-	ncfile.institution =  output_institution
-	ncfile.summary = output_summary
+    ncfile.title = output_title + '\\n' + 'grid input file' + grid_input_file_name + 'parameter input file' + parameter_input_file_name
+    ncfile.institution =  output_institution
+    ncfile.summary = output_summary
     #ncfile.acknowledgment = ""
-	ncfile.date_created = output_date
-	
+    ncfile.date_created = output_date
+    
     # create the z dimensions.
-	ncfile.createDimension('z',dim)
-	ncfile.createDimension('z_dual',dim1)
-	ncfile.createDimension('parameter',dim_parameter)
-	ncfile.createDimension('scalar',dim_scalar)
-	
+    ncfile.createDimension('z',dim)
+    ncfile.createDimension('z_dual',dim1)
+    ncfile.createDimension('parameter',dim_parameter)
+    ncfile.createDimension('scalar',dim_scalar)
+    
     # create the variable
     # first argument is name of variable, second is datatype, third is
     # a tuple with the names of dimensions.
-	data_KMAX = ncfile.createVariable('KMAX','i4',('scalar'))
-	data_KMAX.unit = '-'
-	
-	data_eta = ncfile.createVariable('eta','f8',('z'))
-	data_eta.unit = 'm'
-	data_eta.long_name = '\u03b7 coordinate of volume centroids: zero is at soil surface and and positive upward'
-	
-	data_eta_dual = ncfile.createVariable('etaDual','f8',('z_dual'))
-	data_eta_dual.unit = 'm'
-	data_eta_dual.long_name = '\u03b7 coordinate of volume interfaces: zero is at soil surface and and positive upward. '
-	
-	data_z = ncfile.createVariable('z','f8',('z'))
-	data_z.unit = 'm'
-	data_z.long_name = 'z coordinate  of volume centroids: zero is at the bottom of the column and and positive upward'
-	
-	data_z_dual = ncfile.createVariable('zDual','f8',('z_dual'))
-	data_z_dual.unit = 'm'
-	data_z_dual.long_name = 'z coordinate of volume interfaces: zero is at soil surface and and positive upward.'
-	
-	data_ic = ncfile.createVariable('ic','f8',('z'))
-	data_ic.units = 'K'
-	data_ic.long_name = 'Temperature initial condition'
-		
-	data_space_delta = ncfile.createVariable('spaceDelta','f8',('z_dual'))
-	data_space_delta.unit = 'm'
-	data_space_delta.long_name = 'Distance between consecutive controids, is used to compute gradients'
-	
-	data_soil_volume = ncfile.createVariable('volumeSoil','f8',('z'))
-	data_soil_volume.unit = 'm'
-	data_soil_volume.long_name = 'Volume of soil in each control volume'
-	
-	data_rheology_ID = ncfile.createVariable('rheologyID','f8',('z'))
-	data_rheology_ID.units = '-'
-	data_rheology_ID.long_name = 'label describing the rheology model'
-	
-	data_parameter_ID = ncfile.createVariable('parameterID','f8',('z'))
-	data_parameter_ID.units = '-'
-	data_parameter_ID.long_name = 'label identifying the set of parameters'
-
-	data_soil_particles_density = ncfile.createVariable('soilParticlesDensity','f8',('parameter'))
-	data_soil_particles_density.units = 'kg/m3'
-	data_soil_particles_density.long_name = 'density of soil particles'
-	
-	data_thermal_conductivity_soil_particles = ncfile.createVariable('thermalConductivitySoilParticles','f8',('parameter'))
-	data_thermal_conductivity_soil_particles.units = 'W/m2'
-	data_thermal_conductivity_soil_particles.long_name = 'thermal conductivity of soil particles'
-	
-	data_specific_heat_capacity_soil_particles = ncfile.createVariable('specificThermalCapacitySoilParticles','f8',('parameter'))
-	data_specific_heat_capacity_soil_particles.units = 'J/kg m3'
-	data_specific_heat_capacity_soil_particles.long_name = 'specific thermal capacity of soil particles'
-	
-	data_theta_s = ncfile.createVariable('thetaS','f8',('parameter'))
-	data_theta_s.units = '-'
-	data_theta_s.long_name = 'adimensional water content at saturation'
-	
-	data_theta_r = ncfile.createVariable('thetaR','f8',('parameter'))
-	data_theta_r.units = '-'
-	data_theta_r.long_name = 'adimensional residual water content'
-	
-	data_melting_temperature = ncfile.createVariable('meltingTemperature','f8',('parameter'))
-	data_melting_temperature.units = 'K'
-	data_melting_temperature.long_name = 'melting temperature of soil water'
-	
-	data_par_1 = ncfile.createVariable('par1','f8',('parameter'))
-	data_par_1.units = '-'
-	data_par_1.long_name = 'SFCC parameter'
-	
-	data_par_2 = ncfile.createVariable('par2','f8',('parameter'))
-	data_par_2.units = '-'
-	data_par_2.long_name = 'SFCC parameter'
-	
-	data_par_3 = ncfile.createVariable('par3','f8',('parameter'))
-	data_par_3.units = '-'
-	data_par_3.long_name = 'SFCC parameter'
-	
-	data_par_4 = ncfile.createVariable('par4','f8',('parameter'))
-	data_par_4.units = '-'
-	data_par_4.long_name = 'SFCC parameter'
+    data_KMAX = ncfile.createVariable('KMAX','i4',('scalar'))
+    data_KMAX.unit = '-'
     
-	
-	## write data to variable.
+    data_eta = ncfile.createVariable('eta','f8',('z'))
+    data_eta.unit = 'm'
+    data_eta.long_name = '\u03b7 coordinate of volume centroids: zero is at soil surface and and positive upward'
+    
+    data_eta_dual = ncfile.createVariable('etaDual','f8',('z_dual'))
+    data_eta_dual.unit = 'm'
+    data_eta_dual.long_name = '\u03b7 coordinate of volume interfaces: zero is at soil surface and and positive upward. '
+    
+    data_z = ncfile.createVariable('z','f8',('z'))
+    data_z.unit = 'm'
+    data_z.long_name = 'z coordinate  of volume centroids: zero is at the bottom of the column and and positive upward'
+    
+    data_z_dual = ncfile.createVariable('zDual','f8',('z_dual'))
+    data_z_dual.unit = 'm'
+    data_z_dual.long_name = 'z coordinate of volume interfaces: zero is at soil surface and and positive upward.'
+    
+    data_ic = ncfile.createVariable('ic','f8',('z'))
+    data_ic.units = 'K'
+    data_ic.long_name = 'Temperature initial condition'
+        
+    data_space_delta = ncfile.createVariable('spaceDelta','f8',('z_dual'))
+    data_space_delta.unit = 'm'
+    data_space_delta.long_name = 'Distance between consecutive controids, is used to compute gradients'
+    
+    data_soil_volume = ncfile.createVariable('volumeSoil','f8',('z'))
+    data_soil_volume.unit = 'm'
+    data_soil_volume.long_name = 'Volume of soil in each control volume'
+    
+    data_rheology_ID = ncfile.createVariable('rheologyID','f8',('z'))
+    data_rheology_ID.units = '-'
+    data_rheology_ID.long_name = 'label describing the rheology model'
+    
+    data_parameter_ID = ncfile.createVariable('parameterID','f8',('z'))
+    data_parameter_ID.units = '-'
+    data_parameter_ID.long_name = 'label identifying the set of parameters'
 
-	data_KMAX[0] = KMAX
+    data_soil_particles_density = ncfile.createVariable('soilParticlesDensity','f8',('parameter'))
+    data_soil_particles_density.units = 'kg/m3'
+    data_soil_particles_density.long_name = 'density of soil particles'
+    
+    data_thermal_conductivity_soil_particles = ncfile.createVariable('thermalConductivitySoilParticles','f8',('parameter'))
+    data_thermal_conductivity_soil_particles.units = 'W/m2'
+    data_thermal_conductivity_soil_particles.long_name = 'thermal conductivity of soil particles'
+    
+    data_specific_heat_capacity_soil_particles = ncfile.createVariable('specificThermalCapacitySoilParticles','f8',('parameter'))
+    data_specific_heat_capacity_soil_particles.units = 'J/kg m3'
+    data_specific_heat_capacity_soil_particles.long_name = 'specific thermal capacity of soil particles'
+    
+    data_theta_s = ncfile.createVariable('thetaS','f8',('parameter'))
+    data_theta_s.units = '-'
+    data_theta_s.long_name = 'adimensional water content at saturation'
+    
+    data_theta_r = ncfile.createVariable('thetaR','f8',('parameter'))
+    data_theta_r.units = '-'
+    data_theta_r.long_name = 'adimensional residual water content'
+    
+    data_melting_temperature = ncfile.createVariable('meltingTemperature','f8',('parameter'))
+    data_melting_temperature.units = 'K'
+    data_melting_temperature.long_name = 'melting temperature of soil water'
+    
+    data_par_1 = ncfile.createVariable('par1','f8',('parameter'))
+    data_par_1.units = '-'
+    data_par_1.long_name = 'SFCC parameter'
+    
+    data_par_2 = ncfile.createVariable('par2','f8',('parameter'))
+    data_par_2.units = '-'
+    data_par_2.long_name = 'SFCC parameter'
+    
+    data_par_3 = ncfile.createVariable('par3','f8',('parameter'))
+    data_par_3.units = '-'
+    data_par_3.long_name = 'SFCC parameter'
+    
+    data_par_4 = ncfile.createVariable('par4','f8',('parameter'))
+    data_par_4.units = '-'
+    data_par_4.long_name = 'SFCC parameter'
+    
+    
+    ## write data to variable.
 
-	for i in range(0,dim):
-		data_eta[i] = eta[i]
-		data_z[i] = z[i]
-		data_soil_volume[i] = soil_volume[i]
-		data_ic[i] = ic[i]
-		data_rheology_ID[i] = rheology_ID[i]
-		data_parameter_ID[i] = parameter_ID[i]
-		
-	for i in range(0,dim1):
-		data_eta_dual[i] = eta_dual[i]
-		data_z_dual[i] = z_dual[i]
-		data_space_delta[i] = space_delta[i]
-		
-	for i in range(0,dim_parameter):
-		data_soil_particles_density[i] = soil_particles_density[i]
-		data_thermal_conductivity_soil_particles[i] = thermal_conductivity_soil_particles[i]
-		data_specific_heat_capacity_soil_particles[i] = specific_heat_capacity_soil_particles[i]
-		data_theta_s[i] = theta_s[i]
-		data_theta_r[i] = theta_r[i]
-		data_melting_temperature[i] = melting_temperature[i]
-		data_par_1[i] = par_1[i]
-		data_par_2[i] = par_2[i]
-		data_par_3[i] = par_3[i]
-		data_par_4[i] = par_4[i]
-	
-	## close the file.
-	ncfile.close()
-	print ('\n\n***SUCCESS writing!  '+ output_file_name)
+    data_KMAX[0] = KMAX
 
-	
-	return
+    for i in range(0,dim):
+        data_eta[i] = eta[i]
+        data_z[i] = z[i]
+        data_soil_volume[i] = soil_volume[i]
+        data_ic[i] = ic[i]
+        data_rheology_ID[i] = rheology_ID[i]
+        data_parameter_ID[i] = parameter_ID[i]
+        
+    for i in range(0,dim1):
+        data_eta_dual[i] = eta_dual[i]
+        data_z_dual[i] = z_dual[i]
+        data_space_delta[i] = space_delta[i]
+        
+    for i in range(0,dim_parameter):
+        data_soil_particles_density[i] = soil_particles_density[i]
+        data_thermal_conductivity_soil_particles[i] = thermal_conductivity_soil_particles[i]
+        data_specific_heat_capacity_soil_particles[i] = specific_heat_capacity_soil_particles[i]
+        data_theta_s[i] = theta_s[i]
+        data_theta_r[i] = theta_r[i]
+        data_melting_temperature[i] = melting_temperature[i]
+        data_par_1[i] = par_1[i]
+        data_par_2[i] = par_2[i]
+        data_par_3[i] = par_3[i]
+        data_par_4[i] = par_4[i]
+    
+    ## close the file.
+    ncfile.close()
+    print ('\n\n***SUCCESS writing!  '+ output_file_name)
+
+    
+    return
+
+def main(args):
+    from datetime import datetime
+
+    # Get args
+
+    ## files
+    grid_input_file_name = args.grid_input_file_name
+    ic_input_file_name = args.ic_input_file_name
+    parameter_input_file_name = args.parameter_input_file_name
+    output_file_name = args.output_file_name
+
+    data_grid = pd.read_csv(grid_input_file_name)
+    data_ic = pd.read_csv(ic_input_file_name)
+    data_parameter = pd.read_csv(parameter_input_file_name, comment='#')
+
+    ## parameters
+    dz_min = args.dz_min
+    b = args.b
+    grid_type = args.grid_type
+    interp_model = args.interp_model
+    output_title = args.output_title
+    output_institution = args.output_institution
+    output_summary = args.output_summary
+    output_date = datetime.now().isoformat()
+
+    # Grid
+    [KMAX, eta, eta_dual, space_delta, z, z_dual, control_volume] = grid1D(data_grid,dz_min,b,grid_type)
+    
+    # Initial Conditions
+    ic = set_initial_condition(data_ic, eta, interp_model)
+    
+    # Parameters
+    [rheology_ID, parameter_ID, soil_particles_density, 
+     thermal_conductivity_soil_particles, specific_thermal_capacity_soil_particles,
+     theta_s, theta_r, melting_temperature, par_1, par_2, par_3, par_4] = set_parameters(data_grid, data_parameter, KMAX, eta)
+
+    # Write
+    write_grid_netCDF(eta, eta_dual, z, z_dual, space_delta, control_volume, ic, rheology_ID, parameter_ID, KMAX,
+                  soil_particles_density, thermal_conductivity_soil_particles, specific_thermal_capacity_soil_particles,
+                  theta_s, theta_r, melting_temperature, par_1, par_2, par_3, par_4,
+                  output_file_name, output_title, output_institution, output_summary, output_date, grid_input_file_name, parameter_input_file_name)
+
+if __name__ == "__main__":
+    import argparse
+    import sys
+
+    parser = argparse.ArgumentParser()
+    
+    parser.add_argument('-d', '--dz-min', dest="dz_min", default=0.005, type=float)
+    parser.add_argument('-b', dest='b', default=0.1, type=float)
+    parser.add_argument('-i', '--interp-model', dest='interp_model', default='linear', type=str)
+    parser.add_argument('-g', '--grid-type', choices=["exponential", "classical"], default='exponential', dest="grid_type")
+    parser.add_argument('-s', '--output-summary', dest='output_summary',type=str, default='')
+    parser.add_argument('-t', '--output-title', dest='output_title',type=str, default='')
+    parser.add_argument('-n', '--output-institution', dest='output_institution',type=str, default='')
+    parser.add_argument('-C', '--Initial-Condition', dest="ic_input_file_name" )
+    parser.add_argument('-G', '--Grid-Input', dest="grid_input_file_name")
+    parser.add_argument('-P', '--Parameter-Input', dest="parameter_input_file_name")
+    parser.add_argument("-O", '--Output', type=str, dest="output_file_name")
+
+    args = parser.parse_args()
+    
+    if len(sys.argv) == 1:
+        parser.print_help()
+        sys.exit(0)
+    
+    main(args)
+
+
+
