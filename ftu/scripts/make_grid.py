@@ -1,7 +1,7 @@
 from ftu.FreThaw1D_gridcreator import main as make_grid
 
 
-if __name__ == "__main__":
+def main():
     import argparse
     import sys
 
@@ -26,3 +26,7 @@ if __name__ == "__main__":
         sys.exit(0)
     
     make_grid(args)
+
+
+if __name__ == "__main__":
+    main()

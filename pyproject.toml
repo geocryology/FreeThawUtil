@@ -22,12 +22,13 @@ dependencies = [
     'netCDF4'
 ]
 dynamic = ["version"]
+scripts = {make_grid = "ftu.scripts.make_grid:main"}
 
 [tool.setuptools]
 packages = ["ftu"]
 
 [tool.setuptools.dynamic]
-version = {attr = "ftu.VERSION"}
+version = {attr = "ftu.VERSION.__version__"}
 readme = {file = ["README.md"]}
 
 # ... other project metadata fields as specified in:
