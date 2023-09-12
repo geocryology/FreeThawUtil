@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "freethaw_utils"
+authors = [
+    {name = "Niccolo Tubini"},
+    {name = "Nick Brown", email = "nick.brown@carleton.ca"},
+]
+description = "Functions and classes for working with FreeThaw1D and FreeThaw1DXice"
+readme = "README.rst"
+requires-python = ">=3.7"
+keywords = ["permafrost"]
+# license = {text = "BSD-3-Clause"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "numpy",
+    'pandas',
+    'netCDF4'
+]
+dynamic = ["version"]
+
+[tool.setuptools]
+packages = ["ftu"]
+
+[tool.setuptools.dynamic]
+version = {attr = "ftu.VERSION"}
+readme = {file = ["README.md"]}
+
+# ... other project metadata fields as specified in:
+#     https://packaging.python.org/en/latest/specifications/declaring-project-metadata/

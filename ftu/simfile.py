@@ -143,14 +143,3 @@ patterns = {
     COMMENT : re.compile(r"\s*//(?P<comment>.*)"),
     WS : re.compile(r"^[\s\n]*$")
 }
-
-
-file = "/fs/yedoma/usr-storage/nbr512/FreeThaw/xice/OMS_Project_FreeThawXice1D-0.9/simulation/spinup_in_depth.sim"
-
-
-L = FreeThawSim(file)
-L.set_variable('aMin', 0.04)
-L.comment("solver_spin_up_in_depth.waterDensity")
-# L.write("/fs/yedoma/usr-storage/nbr512/FreeThaw/xice/OMS_Project_FreeThawXice1D-0.9/simulation/spinup_in_depth_edited.sim")
-
-
