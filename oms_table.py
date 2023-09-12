@@ -178,6 +178,7 @@ def write_oms(filename:str,
         raise NotImplementedError
     
     formats = ["yyyy-MM-dd HH:mm"] + ["" for _ in range(data.shape[1])]
+    ID = [""] + [str(i) for i in range(data.shape[1])]
 
     df.insert(0, "timestamp", dates)
     dtypes.insert(0, "Date")
@@ -185,6 +186,7 @@ def write_oms(filename:str,
     t = OmsTable(data=df,
                  tblheader="OMS Data Table",
                  formats=formats,
-                 dtypes=dtypes)
+                 dtypes=dtypes,
+                 metadata={"ID": ID})
     
     t.write(filename)
