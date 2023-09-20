@@ -86,8 +86,11 @@ class OmsTable:
             # Data
             tbl = pd.DataFrame(data=self.data.values)
             tbl.insert(0, "blank", "")
-            f.write(tbl.to_csv(index=False, header=False, lineterminator="\n"))
-
+            try:  # pandas>=1.5.0
+                f.write(tbl.to_csv(index=False, header=False, lineterminator="\n"))
+            except TypeError:  # pandas<1.5.0
+                f.write(tbl.to_csv(index=False, header=False, line_terminator="\n"))
+            
 
     @classmethod
     def from_pandas(cls, df):
@@ -97,6 +100,7 @@ class OmsTable:
 DTYPE = {"int64": "Integer",
          "object": "String",
          "float64": "Real",
+         "float32": "Real",
          "bool": "Boolean",
          "datetime64": "Date",
          "timedelta[ns]":None}
