@@ -109,7 +109,7 @@ These can be used to define other variables, which may be identical for differen
 * reader_data_inHeatTransferCoefficient.fileNovalue"      "-9999"
 
 ### snow cover
-* reader_data_inSnowCover.file" (_str_) Path to the file containing the snow cover values
+* reader_data_inSnowCover.file" (_str_) Path to the file containing the snow cover timeseries (0 = no snow, 1 = snow cover)
 * reader_data_inSnowCover.idfield"          "ID"
 * reader_data_inSnowCover.tStart"           [tstart](#time)
 * reader_data_inSnowCover.tEnd"             [tEnd](#time)
