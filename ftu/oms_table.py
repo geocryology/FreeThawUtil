@@ -63,7 +63,7 @@ class OmsTable:
     def write(self, filename:str):
         with open(filename, 'w') as f:
             # Header
-            f.write(f"@Table, {self.header}\n")
+            f.write(f"@T,{self.header}\n")
             
             # Metadata
             if self.metadata:
@@ -79,7 +79,7 @@ class OmsTable:
 
             # Columns
             if len(self._columns) > 0:
-                f.write(f"@Header,{','.join(self._columns)}\n")
+                f.write(f"@H,{','.join(self._columns)}\n")
             else:
                 raise ValueError("No columns defined")
 
@@ -87,9 +87,9 @@ class OmsTable:
             tbl = pd.DataFrame(data=self.data.values)
             tbl.insert(0, "blank", "")
             try:  # pandas>=1.5.0
-                f.write(tbl.to_csv(index=False, header=False, lineterminator="\n"))
+                f.write(tbl.to_csv(index=False, header=False, lineterminator="\r\n"))
             except TypeError:  # pandas<1.5.0
-                f.write(tbl.to_csv(index=False, header=False, line_terminator="\n"))
+                f.write(tbl.to_csv(index=False, header=False, line_terminator="\r\n"))
             
 
     @classmethod
