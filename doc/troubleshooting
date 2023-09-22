@@ -1,8 +1,0 @@
-* Invalid table structure
-your table needs to have the following header:
-```
-@T,tablename
-@H,headers,
-ID,,0
-```
-and needs to have `CRLF` line terminators
