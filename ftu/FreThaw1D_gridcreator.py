@@ -457,6 +457,51 @@ def set_parameters(data_grid, data_parameter, KMAX, eta):
     return [rheology_ID, parameter_ID, soil_particles_density, thermal_conductivity_soil_particles, specific_heat_capacity_soil_particles,
          theta_s, theta_r, melting_temperature, par_1, par_2, par_3, par_4]
 
+def extract_grid_for_shallow_spinup(depth_shallow_column, eta, eta_dual, z, z_dual, space_delta, soil_volume, ic, excess_ice_volume, equation_state_ID, parameter_ID, regrid_ID, KMAX, 
+					  VECTOR_LENGTH):
+    ## find index lower control volume
+    idk = find_nearest(z[0:KMAX], z_dual[KMAX]-depth_shallow_column)[1]
+    
+    shallow_grid_eta = np.zeros(VECTOR_LENGTH)
+    shallow_grid_eta_dual = np.zeros(VECTOR_LENGTH)
+    shallow_grid_z = np.zeros(VECTOR_LENGTH)
+    shallow_grid_z_dual = np.zeros(VECTOR_LENGTH)
+    shallow_grid_space_delta = np.zeros(VECTOR_LENGTH)
+    shallow_grid_soil_volume = np.zeros(VECTOR_LENGTH)
+    shallow_grid_excess_ice_volume = np.zeros(VECTOR_LENGTH)
+    shallow_grid_ic = np.zeros(VECTOR_LENGTH)
+    shallow_grid_equation_state_ID = np.zeros(VECTOR_LENGTH)
+    shallow_grid_parameter_ID = np.zeros(VECTOR_LENGTH)
+    shallow_grid_regrid_ID = np.zeros(VECTOR_LENGTH)
+    
+    shallow_grid_z_dual[0] = z_dual[idk]
+    shallow_grid_z_dual[KMAX-idk] = z_dual[KMAX]
+    
+    shallow_grid_eta_dual[0] = eta_dual[idk]
+    shallow_grid_eta_dual[KMAX-idk] = eta_dual[KMAX]
+    
+    shallow_grid_space_delta[0] = z[idk] - shallow_grid_z_dual[0]
+    shallow_grid_space_delta[KMAX-idk] = space_delta[KMAX]
+    
+    for k in range(0,KMAX-idk):
+        shallow_grid_eta[k] = eta[idk+k]
+        shallow_grid_z[k] = z[idk+k]
+        shallow_grid_soil_volume[k] = soil_volume[idk+k]
+        shallow_grid_excess_ice_volume[k] = excess_ice_volume[idk+k]
+        shallow_grid_ic[k] = ic[idk+k]
+        shallow_grid_equation_state_ID[k] = equation_state_ID[idk+k]
+        shallow_grid_parameter_ID[k] = parameter_ID[idk+k]
+        shallow_grid_regrid_ID[k] = regrid_ID[idk+k]
+        
+        shallow_grid_z_dual[k+1] = z_dual[idk+k+1]
+        shallow_grid_eta_dual[k+1] = eta_dual[idk+k+1]
+        shallow_grid_space_delta[k+1] = space_delta[idk+k+1]
+        
+        
+    shallow_grid_KMAX = KMAX-idk
+        
+    return [idk, shallow_grid_eta, shallow_grid_eta_dual, shallow_grid_z, shallow_grid_z_dual, shallow_grid_space_delta, shallow_grid_soil_volume, shallow_grid_excess_ice_volume, shallow_grid_ic, shallow_grid_equation_state_ID, shallow_grid_parameter_ID, shallow_grid_regrid_ID, shallow_grid_KMAX]
+
 
 def write_grid_netCDF(eta, eta_dual, z, z_dual, space_delta, soil_volume, ic, rheology_ID, parameter_ID, KMAX, soil_particles_density,              
                       thermal_conductivity_soil_particles, 
@@ -692,6 +737,7 @@ def write_grid_netCDF(eta, eta_dual, z, z_dual, space_delta, soil_volume, ic, rh
 
     
     return
+
 
 def main(args):
     from datetime import datetime
