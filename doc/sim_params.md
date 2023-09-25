@@ -173,7 +173,7 @@ These can be used to define other variables, which may be identical for differen
 ### ???
 
 * reader_NetCDF_deep_grid.gridFilename" 					"${pathGridDeep}"
-* reader_NetCDF_shallow_grid_backup.gridFilename"  		"${pathShallowSpinupBackUp}"
+* reader_NetCDF_shallow_grid_backup.gridFilename As of 2023-09 this needs to be `writer_NetCDF_backup.filename` with a suffix of `_SimulationBackUp.nc`
 * reader_NetCDF_spin_up_mean_T.gridFilename" 		 	"${pathShallowSpinupMeanT}"
 * writer_NetCDF_spinup_in_depth.gridFileName"	  "${pathOutputSpinUpInDepth}"
 * writer_NetCDF_spinup_in_depth.briefDescritpion"  ""
