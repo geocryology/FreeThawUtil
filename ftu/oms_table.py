@@ -65,6 +65,12 @@ class OmsTable:
             # Header
             f.write(f"@T,{self.header}\n")
             
+            # Columns
+            if len(self._columns) > 0:
+                f.write(f"@H,{','.join(self._columns)}\n")
+            else:
+                raise ValueError("No columns defined")
+            
             # Metadata
             if self.metadata:
                 for k, v in self.metadata.items():
@@ -77,11 +83,6 @@ class OmsTable:
             f.write(f"Type,{','.join(dtype for dtype in self._dtypes)}\n")
             f.write(f"Format,{','.join(format for format in self._formats)}\n")
 
-            # Columns
-            if len(self._columns) > 0:
-                f.write(f"@H,{','.join(self._columns)}\n")
-            else:
-                raise ValueError("No columns defined")
 
             # Data
             tbl = pd.DataFrame(data=self.data.values)
