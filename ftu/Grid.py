@@ -8,10 +8,17 @@ class Grid(object):
     def __init__(self, nc_grid_file):
         """ Representation of FreeThaw grid files """
         self.nc_grid_file = nc_grid_file
-        self.nc = nc.Dataset(nc_grid_file)
+        self.nc = nc.Dataset(nc_grid_file, 'r')
         self.vi = self._valid_indices()
         self._vars = {}
         self._build_vars()
+
+    def __del__(self):
+        # close nc on deletion
+        try:
+            self.nc.close()
+        except AttributeError:
+            pass
 
     def __repr__(self):
         type_ = type(self)
@@ -66,6 +73,7 @@ class Grid(object):
             # create vertical line at 273.15k
             ax.axvline(273.15, color='r', linestyle='--')
         fig.show()
+        return fig
 
     def view_all(self):
         pass
@@ -79,8 +87,8 @@ class Grid(object):
         return V
     
     def constant_names(self):
-        dims = [d for d, v in F.nc.dimensions.items() if v.size == 1]
-        V = [v for v in F.nc.variables if len(F.nc[v].dimensions) == 1 and F.nc[v].dimensions[0] in dims]
+        dims = [d for d, v in self.nc.dimensions.items() if v.size == 1]
+        V = [v for v in self.nc.variables if len(self.nc[v].dimensions) == 1 and self.nc[v].dimensions[0] in dims]
         return V
     
     def _build_vars(self):
@@ -92,20 +100,36 @@ class Grid(object):
 
         for z in self.constant_names():
             self._vars[z] = self.nc[z][:]
+    
+    @property
+    def vars(self):
+        return list(self._vars.keys())
         
 
+def _set_surface_height(grid, height):
+    ''' Set the surface height of a grid to a given value'''
+    with nc.Dataset(grid, 'a') as f:
+        f['surfaceHeight'][:] = height
+    print(f'surfaceHeight set to {round(height, 2)} m')
+
+
+def _reset_surface_height(grid):
+    '''Set the surface height of a grid according to the current column height (z)'''
+    with nc.Dataset(grid, 'r') as f:
+        zmax = max(f['z'][:])
+    _set_surface_height(grid, zmax)
+
+
 if __name__ == "__main__":
-    D = nc.Dataset(r"C:\Users\Nick\Downloads\sim1063.tar\sim1063\output\_deep_spinup.nc")
-    D = nc.Dataset(r"C:\Users\Nick\Downloads\sim1063.tar\sim1063\output\_deep_spinup.nc")
-    e = nc.Dataset(r"C:\Users\Nick\Downloads\sim1063.tar\sim1063\input\deepGrid.nc")
+    pass    
+"""
+for f in Path("/scratch/s/stgruber/nbr512/NBFT/OMSPROJ/myriad").glob("sim*/output/_deep_spinup.nc"):
+    print(f.parent.parent.name)
+    _reset_surface_height(f)
 
-    s = Grid(r"C:\Users\Nick\Downloads\sim1063.tar\sim1063\input\shallowGrid.nc")
-    S = Grid(r"C:\Users\Nick\Downloads\sim1063.tar\sim1063\output\_shallow_spinup_SimulationBackUp.nc")
-    D = Grid(r"C:\Users\Nick\Downloads\sim1063.tar\sim1063\output\_deep_spinup.nc")
-    F = Grid(r"C:\Users\Nick\Downloads\sim1063.tar\sim1063\output\_Sim_complete_backup_SimulationBackUp.nc")
-
-    S.view('ic', 'z')
-    D.view('ic', 'z')
-
-    S.view('ic', 'eta')
-    D.view('ic', 'eta')
+for g in `ls sim*/output/_deep_spinup.nc`
+do 
+echo dirname dirname $g
+cp $g $g.bak
+done
+"""
