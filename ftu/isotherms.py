@@ -158,7 +158,8 @@ def extract_alt_isotherm(T, t, iso, z, hs):
     hs : np.ndarray
         ground surface height
     """
-    
+    T = ensure_units_celcius(T)
+
     # make empty array
     res = np.empty(len(t))
     res[:] = np.nan
@@ -173,7 +174,10 @@ def extract_alt_isotherm(T, t, iso, z, hs):
             print(str(e))
             
     df = pd.Series(index=t, data=res, name='isotherm')
-    alt = df.rolling("365D", min_periods=np.nan).min()
+    try:
+        alt = df.rolling("365D", min_periods=np.nan).min()
+    except ValueError:  # version differences in pandas
+        alt = df.rolling("365D", min_periods=None).min()
     
     return alt
             
@@ -195,13 +199,12 @@ def extract_alt_isotherm_depth(T, t, iso, depth, hs):
     hs : np.ndarray
         ground surface height
     """
-    
+    T = ensure_units_celcius(T)
     # make empty array
     res = np.ma.array(np.empty(len(t)))
     res[:] = np.nan
     
     z = depth_to_height(depth, hs)
-    
     # split into yearly bins
     ti = pd.DatetimeIndex(t)
     for Y in range(t[0].year, t[-1].year):
@@ -216,8 +219,10 @@ def extract_alt_isotherm_depth(T, t, iso, depth, hs):
     df[df==0] = pd.NA
 
     alt = df.rolling("365D", min_periods=1).min()
-    
-    return alt
+    hdf = pd.DataFrame(index=t, data={'hs':hs})
+    res = pd.merge(alt, hdf, how='inner', left_index=True, right_index=True)
+    res['alt'] = res['hs'] - res['isotherm']
+    return res[['alt']]
 
 
 def depth_to_height(d: np.ndarray, hs: np.ndarray):
@@ -238,4 +243,9 @@ def depth_to_height(d: np.ndarray, hs: np.ndarray):
     _d = np.tile(d, ((hs.shape[0],1)))
     h = _hs - _d
     return h
-    
+
+def ensure_units_celcius(T: np.ndarray):
+    if np.nanmax(T) > 100:
+        return T - 273.15
+    else:
+        return T

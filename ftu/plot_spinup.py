@@ -2,8 +2,9 @@ import netCDF4 as nc
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import cm
+from ._version import __version__
 
-def show_spinup(shallow_spinup:str):
+def show_spinup(shallow_spinup:str, metadata=True):
     """Plot the spinup of a shallow model run
     
     Parameters
@@ -20,11 +21,19 @@ def show_spinup(shallow_spinup:str):
         temp = nss['mean_temperature_in_ground'][:] - 273.15
         h = nss['height'][:]
 
-    fig, axs = plt.subplots(2,2)
+    fig, axs = plt.subplots(2,2, figsize=(10,10))
+    
+    if metadata:
+        fig.suptitle("Shallow spinup")
+        fig.text(0.98, 0.01, f'{shallow_spinup}', ha='right')
+        fig.text(0.02, 0.01, f'FreeThawUtils v{__version__}', ha='left', va='bottom')
 
     # lowest depth
     LD = axs[0,0]
+    LD.set_title(f"Deepest output ({min(h):0.1f} m)")
     LD.plot(time, temp[:,-1])
+    LD.tick_params(axis='x', labelrotation=90)
+    LD.set_ylabel("Temperature [°C]")
 
     # last p% of spinup
     # lowest depth
@@ -37,19 +46,32 @@ def show_spinup(shallow_spinup:str):
     cmap = cm.get_cmap('winter')
     clist = cmap(np.arange(0,1,1/10))
     PE = axs[0,1]
+    PE.set_title("Profile evolution")
+    PE.set_ylabel("Height [m]")
+    PE.set_xlabel("Temperature [°C]")
+
     tPE = time[::len(time)//n][:n]
     TPE = temp[::len(time)//n,][:10,]
     for i in range(n):
-        PE.plot(TPE[i,:], h, color=clist[i], alpha=0.5)
-
+        if i in [0, n-1]:
+            PE.plot(TPE[i,:], h, color=clist[i], alpha=0.5, label=f"{tPE[i].strftime('%Y-%m-%d')}")
+            PE.tick_params(axis='x', labelrotation=90)
+        else:
+            PE.plot(TPE[i,:], h, color=clist[i], alpha=0.5)
+    PE.legend()
+    
     # profile evolution (n=10 steps)
     PEp = axs[1,1]
     lastP = (p*(len(time) // 100))
     tPEp = time[lastP:][::len(time[lastP:])//n][:n]
     TPEp = temp[lastP:,][::len(time[lastP:])//n,][:n,]
     for i in range(n):
-        PEp.plot(TPEp[i,:], h, color=clist[i], alpha=0.5)
-
+        if i in [0, n-1]:
+            PEp.plot(TPEp[i,:], h, color=clist[i], alpha=0.5, label=f"{tPE[i].strftime('%Y-%m-%d')}")
+        else:
+            PEp.plot(TPEp[i,:], h, color=clist[i], alpha=0.5)
+    PEp.legend()
+    PEp.set_xlabel("Temperature [°C]")
     fig.show()
 
     return fig
@@ -88,4 +110,5 @@ def profile_evo(depths, times, values, P:int=100, n:int=10):
 
     fig.show()
 
-profile_evo(df_dpt.columns, df_dpt.index, df_dpt.values  -273.15)
+if __name__ == "__main__":
+    profile_evo(df_dpt.columns, df_dpt.index, df_dpt.values  -273.15)

@@ -28,8 +28,8 @@ class AllVariables:
         """ Time values """
         timevar = self.ds['time']
         times = nc.num2date(timevar[:], timevar.units, 'standard',
-                            use_only_python_datetimes=True, 
-                            use_only_cftime_datetimes=False)
+                            only_use_python_datetimes=True, 
+                            only_use_cftime_datetimes=False)
         return times
 
     @property
@@ -99,4 +99,3 @@ def _get_var_at_depth(var: np.ndarray, depth: np.ndarray, d: float) -> np.ndarra
     """ 2d array (time,)"""
     return None
 
-A = AllVariables('/scratch/s/stgruber/nbr512/NBFT/OMSPROJ/myriad/sim85/output/_Sim_complete_all_variables_0000.nc')
