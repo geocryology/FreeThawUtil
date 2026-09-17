@@ -8,3 +8,8 @@ your table needs to have the following header (line order is important). This se
 ID,,0
 ```
 and needs to have `CRLF` line terminators
+
+
+* ArrayIndexOutOfBoundsException
+
+if this happens during `refineCloseToZeroIsotherm`, you may need to adjust your grid parameters or adjust KMAX in your sim file
