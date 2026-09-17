@@ -1,5 +1,5 @@
 import re
-
+from typing import Optional
 
 DEF = "definition"
 COMMENT = "comment"
@@ -12,60 +12,6 @@ FT = "from-to"
 WS = "whitespace only"
 
 
-class FreeThawSim:
-
-    def __init__(self, file):
-        self.file = file
-        self._lines = self._read(file)
-
-    @property
-    def lines(self):
-        return self._lines
-
-    def _read(self, file):
-        with open(file) as f:
-            lines = f.readlines()
-            matched_lines = []
-            
-            for l in lines:                
-                matched_lines.append(Line(l))
-
-        return matched_lines        
-
-    def write(self, file):
-        lines = [line.text for line in self.lines]
-        
-        with open(file, 'w') as f:
-            f.writelines(lines)
-
-    def set_variable(self, key, value):
-        L = self.get_variable_line(key)
-        if L:
-            L.set_variable(value)
-            return
-
-    def get_variable_line(self, key):
-        for L in self.lines:
-            if key == L.get("key"):
-                return L
-
-    def get_fromto_line(self, key):
-        for L in self.lines:
-            if key == L.get("from"):
-                return L
-
-    def comment(self, parameter):
-        for L in self.lines:
-            if parameter == L.get("from"):
-                L.comment()
-                return
-    
-    def uncomment(self, parameter):
-        for L in self.lines:
-            if parameter == L.get("from"):
-                L.uncomment()
-                return
-
 
 class Line:
 
@@ -75,7 +21,7 @@ class Line:
         self._text = text
         self._unknown = None
         self._dict = {}
-        self.parse(text)
+        self._parse(text)
 
     def __str__(self):
         return self.__repr__()
@@ -87,10 +33,13 @@ class Line:
     def text(self):
         return self._text
 
+    def value(self):
+        self.get('value')
+    
     def get(self, key):
         return self._dict.get(key)
 
-    def parse(self, text):
+    def _parse(self, text):
         for t, p in patterns.items():
                 
             if match:=p.match(text):
@@ -130,6 +79,88 @@ class Line:
             self._text = f'def {self.get("key")} = "{value}"\n'
         else:
             self._text = f'def {self.get("key")} = {value}\n'
+
+
+class FreeThawSim:
+
+    def __init__(self, file):
+        self.file = file
+        self._lines = self._read(file)
+
+    @property
+    def lines(self):
+        return self._lines
+
+    def _read(self, file):
+        with open(file) as f:
+            lines = f.readlines()
+            matched_lines = []
+            
+            for l in lines:                
+                matched_lines.append(Line(l))
+
+        return matched_lines        
+
+    def write(self, file):
+        lines = [line.text for line in self.lines]
+        
+        with open(file, 'w') as f:
+            f.writelines(lines)
+
+    def set_variable(self, key, value) -> Optional[Line]:
+        L = self.get_variable_line(key)
+        if L:
+            L.set_variable(value)
+            return
+
+    def get_variable_line(self, key):
+        for L in self.lines:
+            if key == L.get("key"):
+                return L
+
+    def get_fromto_line(self, key):
+        for L in self.lines:
+            if key == L.get("from"):
+                return L
+
+    def comment(self, parameter):
+        for L in self.lines:
+            if parameter == L.get("from"):
+                L.comment()
+                return
+    
+    def uncomment(self, parameter):
+        for L in self.lines:
+            if parameter == L.get("from"):
+                L.uncomment()
+                return
+
+def nq(s:str) -> str:
+    if s[0]==s[-1] and s[0] in ['"', "'"]:
+        return s[1:-1]
+    else:
+        return s
+    
+def _qq(s:str):
+    return f'"{s}"'
+    
+
+def resolve(freethaw_sim: FreeThawSim, target:str, home=None):
+    d = dict()
+    for line in freethaw_sim._lines:
+        if line._type == DEF:
+            d[line.get('key')] = line.get('value').split("//")[0].strip()
+
+    while "$" in target:
+        for key in d.keys():
+            val = d[key]
+            if f"${key}" in target:
+                target = re.sub(fr"\${key}", nq(val), target)
+
+    if home is not None:
+        target = re.sub('oms_prj', home, target)
+    
+    return nq(target)
 
 
 patterns = {

@@ -158,6 +158,7 @@ def write_oms(filename:str,
               dates:"Union[pd.DatetimeIndex,list[datetime.datetime]]", 
               data:"np.ndarray",
               infer_dtypes:bool=True,
+              metadata={},
               ) -> None:
     """ Write data to an OMS table-formatted file.
     
@@ -170,10 +171,15 @@ def write_oms(filename:str,
     data : np.ndarray
         Data to write, first dimension must match length of dates.
     """
-    if not isinstance(dates, pd.DatetimeIndex):
-        dates = pd.DatetimeIndex(dates)
-    dates = dates.strftime("%Y-%m-%d %H:%M")
+    if isinstance(dates, list):
+        dates = [d.strftime("%Y-%m-%d %H:%M") for d in dates]
+    else:
+        if not isinstance(dates, pd.DatetimeIndex):
+            dates = pd.DatetimeIndex(dates)
+        dates = dates.strftime("%Y-%m-%d %H:%M")
 
+    if len(data.shape) == 1:
+        data = np.atleast_2d(data).transpose()
     names = [f"value_{i}" for i in range(data.shape[1])]
     df = pd.DataFrame(data=data, index=dates, columns=names)
     
@@ -187,11 +193,12 @@ def write_oms(filename:str,
 
     df.insert(0, "timestamp", dates)
     dtypes.insert(0, "Date")
-
+    m_dict = {"ID": ID}
+    m_dict.update(metadata)
     t = OmsTable(data=df,
                  tblheader="OMS Data Table",
                  formats=formats,
                  dtypes=dtypes,
-                 metadata={"ID": ID})
+                 metadata=m_dict)
     
     t.write(filename)
