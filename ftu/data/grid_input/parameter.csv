@@ -1,0 +1,5 @@
+density,thermalConductivity,specificHeatCapacity,thetaS,thetaR,meltingT,par1,par2,par3,par4
+# silt
+2755,3.2,699.09,0.49,0.05,273.15,0.65,1.67,nan,nan
+#rock, granite
+2750,3.8,890,nan,nan,273.15,nan,nan,nan,nan
