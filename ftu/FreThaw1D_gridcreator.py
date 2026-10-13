@@ -15,7 +15,7 @@ from netCDF4 import Dataset
 
 
 
-def grid1D(data_grid, dz_min, b, grid_type, **kwargs):
+def grid1D(data_grid:pd.DataFrame, dz_min:float, b:float, grid_type:str, **kwargs):
 	'''
     This function creates the geometry of 1D grid for a finite volume numerical.     
     
@@ -57,10 +57,10 @@ def grid1D(data_grid, dz_min, b, grid_type, **kwargs):
 	elif(grid_type=='exponential'):
 		return build_grid_exponential(data_grid, dz_min, b,**kwargs)
 	else:
-		print('Check grid_type')
+		raise ValueError(f"grid_type must be either 'exponential' or 'classical', got {grid_type}")
 		
 
-def build_grid(data_grid, **kwargs):
+def build_grid(data_grid:pd.DataFrame, **kwargs) -> list:
     '''
     This function creates the geometry of 1D grid for a finite volume numerical. The discretizion is 
 	with constant mesh spacing in each layers.
@@ -190,7 +190,7 @@ def build_grid(data_grid, **kwargs):
     return [KMAX, VECTOR_LENGTH, eta, eta_dual, space_delta, z, z_dual, control_volume]
 
 
-def build_grid_exponential(data_grid, dz_min, b, **kwargs):
+def build_grid_exponential(data_grid:pd.DataFrame, dz_min:float, b:float, **kwargs) -> list:
     '''
     This function creates the geometry of 1D grid for a finite volume numerical. The discretizion is 
     with exponential function (Gubler S. et al. 2013, doi:10.5194/gmd-6-1319-2013).
