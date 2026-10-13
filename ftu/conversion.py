@@ -1,6 +1,19 @@
-from groundmodel.core import SoilColumn, Layer
+from pathlib import Path
+
 import pandas as pd
 import numpy as np
+import logging
+
+logger = logging.getLogger(__name__)
+
+from groundmodel.core import SoilColumn, Layer
+from ftu.FreThaw1D_gridcreator import (write_grid_netCDF, 
+                                    grid1D, 
+                                    set_initial_excess_ice,
+                                    set_regrid_parameters,
+                                    extract_grid_for_shallow_spinup,
+                                    set_initial_condition,
+                                    set_parameters)
 
 SampleLayer1 = Layer({
            'p::layer_thickness': 1.0,
@@ -45,7 +58,7 @@ def get_layer_midpoints(column: SoilColumn) -> np.ndarray:
     
     return midpoints
 
-def column_to_ic(column: SoilColumn) -> pd.DataFrame:
+def column_to_ic_csv(column: SoilColumn) -> pd.DataFrame:
     "Convert a SoilColumn object to a DataFrame containing the initial condition (ic) for each layer."
     lb = get_lower_boundaries(column)
     midpoints = get_layer_midpoints(column)
@@ -57,7 +70,7 @@ def column_to_ic(column: SoilColumn) -> pd.DataFrame:
     return pd.DataFrame({'eta': eta, 'T0': ic})
 
 
-def column_to_ratio(column: SoilColumn) -> pd.DataFrame:
+def column_to_ratio_csv(column: SoilColumn) -> pd.DataFrame:
     lb = get_lower_boundaries(column)
     midpoints = get_layer_midpoints(column)
     eta = np.concat([np.array([0]), midpoints, lb[-1:]])  
@@ -76,7 +89,7 @@ def column_to_ratio(column: SoilColumn) -> pd.DataFrame:
     return pd.DataFrame({'eta': eta, 'EI_ratio': r})
 
 
-def column_to_parameter(column: SoilColumn) -> pd.DataFrame:
+def column_to_parameter_csv(column: SoilColumn) -> pd.DataFrame:
     df = column.as_dataframe()
     df = df.rename(columns=lambda c: c.replace("freethaw::", ""))
     df = df.rename(columns=lambda c: c.replace("meltingTemperature", "meltingT"))
@@ -93,7 +106,8 @@ def column_to_parameter(column: SoilColumn) -> pd.DataFrame:
                       "par3",
                       "par4"]]
 
-def column_to_grid(column: SoilColumn) -> pd.DataFrame:
+
+def column_to_grid_csv(column: SoilColumn) -> pd.DataFrame:
     """Convert a SoilColumn object to a DataFrame containing the grid data.
     Type,eta,K,equationStateID,parameterID
        L,0,nan,0,0
@@ -116,10 +130,106 @@ def column_to_grid(column: SoilColumn) -> pd.DataFrame:
                          'parameterID': parameterid})
 
 
+def column_to_grids(soilcolumn: SoilColumn,
+                    create_files_in:str,
+                    regrid_input_file_name:str,
+                    name='newGrid',
+                    shallow_grid_depth:float=10,
+                    dz_min:float=0.01,
+                    b:float=0.01,
+                    grid_type:str='exponential'):
+    
+    if not grid_type in ['exponential', 'classical']:
+        raise ValueError(f"grid_type must be either 'exponential' or 'classical', got {grid_type}")
+    
+    logger.info(f"Creating Grid: {name} in {create_files_in}")
+    grid_input_file_name = str(Path(create_files_in) / f"{name}_grid.csv")
+    parameter_input_file_name = str(Path(create_files_in) / f"{name}_parameter.csv")
+    output_file_name =  str(Path(create_files_in) / "deepGrid.nc")
+    output_file_name_shallow_grid = str(Path(create_files_in) / "shallowGrid.nc")
+
+    output_title ="" 
+    output_title_shallow_grid = "" 
+    output_summary = "" 
+    output_summary_shallow_grid ="" 
+    output_date = "" 
+    output_institution = ''
+
+    size_factor = 5
+
+    interp_model_ic = "linear"
+    interp_model_EI_ratio = "next"
+
+    data_grid = column_to_grid_csv(soilcolumn)
+    data_ic = column_to_ic_csv(soilcolumn)
+    data_EI_ratio = column_to_ratio_csv(soilcolumn)
+    data_parameter = column_to_parameter_csv(soilcolumn)
+
+    data_grid.to_csv(grid_input_file_name, index=False)
+    data_ic.to_csv(parameter_input_file_name, index=False)
+    data_EI_ratio.to_csv(parameter_input_file_name, index=False)
+    data_parameter.to_csv(parameter_input_file_name, index=False)
+   
+    data_regrid = pd.read_csv(regrid_input_file_name)
+
+    [KMAX, VECTOR_LENGTH, eta, eta_dual, space_delta, z, z_dual, control_volume] = grid1D(data_grid, dz_min, b, grid_type, size_factor=size_factor)
+    logger.info(f"KMAX={KMAX}, VEC_LEN={VECTOR_LENGTH}")
+
+    ic = set_initial_condition(data_ic, eta, interp_model_ic,fill_value=0.0)
+
+    [excess_ice_volume,soil_volume] = set_initial_excess_ice(data_EI_ratio, eta, ic, control_volume, interp_model_EI_ratio,fill_value=0.0)
+
+    [regrid_ID, buffer_temperature_close_to_zero_isotherm, control_volume_size_close_to_zero_isotherm] = set_regrid_parameters(data_regrid, eta)
+
+    [equation_state_ID, parameter_ID, density, thermal_conductivity, specific_heat_capacity, theta_s, theta_r,
+    melting_temperature, par_1, par_2, par_3, par_4] = set_parameters(data_grid, data_parameter, KMAX, VECTOR_LENGTH, eta)
+
+    [idk, shallow_grid_eta, shallow_grid_eta_dual, shallow_grid_z, shallow_grid_z_dual, shallow_grid_space_delta, shallow_grid_soil_volume, 
+    shallow_grid_excess_ice_volume, shallow_grid_ic, shallow_grid_equation_state_ID, shallow_grid_parameter_ID, 
+    shallow_grid_regrid_ID, shallow_grid_KMAX] = extract_grid_for_shallow_spinup(shallow_grid_depth, eta, eta_dual, z, z_dual, space_delta, soil_volume, ic, excess_ice_volume, equation_state_ID, parameter_ID, regrid_ID, KMAX, 
+                        VECTOR_LENGTH)
+
+    # Shallow
+    write_grid_netCDF(shallow_grid_eta, shallow_grid_eta_dual, shallow_grid_z, 
+                    shallow_grid_z_dual, shallow_grid_space_delta, 
+                    shallow_grid_soil_volume, shallow_grid_ic, 
+                    shallow_grid_excess_ice_volume, 
+                    shallow_grid_equation_state_ID, shallow_grid_parameter_ID,
+                    shallow_grid_regrid_ID, shallow_grid_KMAX, VECTOR_LENGTH,
+                    buffer_temperature_close_to_zero_isotherm,
+                    control_volume_size_close_to_zero_isotherm, density,
+                    thermal_conductivity, specific_heat_capacity, theta_s,
+                    theta_r, melting_temperature, par_1, par_2, par_3, par_4,
+                    output_file_name_shallow_grid, output_title_shallow_grid,
+                    output_institution, output_summary_shallow_grid,
+                    output_date, grid_input_file_name,
+                    parameter_input_file_name)
+
+    # Deep
+    write_grid_netCDF(eta, eta_dual, z, z_dual, space_delta, soil_volume, ic,
+                    excess_ice_volume, equation_state_ID, parameter_ID,
+                    regrid_ID, KMAX, VECTOR_LENGTH,
+                    buffer_temperature_close_to_zero_isotherm,
+                    control_volume_size_close_to_zero_isotherm,
+                    density, thermal_conductivity, specific_heat_capacity,
+                    theta_s, theta_r, melting_temperature, par_1, par_2,
+                    par_3, par_4, output_file_name, output_title,
+                    output_institution, output_summary, output_date,
+                    grid_input_file_name, parameter_input_file_name)
+    
+
 
 if __name__ == "__main__":
     column = SampleColumn
-    print(column_to_ic(column))
-    print(column_to_ratio(column))
-    print(column_to_parameter(column))
-    print(column_to_grid(column))
+    print(column_to_ic_csv(column))
+    print(column_to_ratio_csv(column))
+    print(column_to_parameter_csv(column))
+    print(column_to_grid_csv(column))
+    column_to_grids(column,
+                    create_files_in=r"C:/Users/nicho/downloads",
+                    regrid_input_file_name=r"C:\Users\nicho\src\FreeThawUtil\ftu\data\grid_input\regrid.csv",
+                    name='newGrid',
+                    shallow_grid_depth=10,
+                    dz_min=0.01,
+                    b=0.01,
+                    grid_type='exponential')
