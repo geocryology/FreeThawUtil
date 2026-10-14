@@ -2,11 +2,14 @@ from pathlib import Path
 
 import pandas as pd
 import numpy as np
+import netCDF4 as nc
 import logging
+
+from ftu.grid import Grid
 
 logger = logging.getLogger(__name__)
 
-from groundmodel.core import SoilColumn, Layer
+from groundmodel.core import SoilColumn, Layer, Material, Property
 from ftu.FreThaw1D_gridcreator import (write_grid_netCDF, 
                                     grid1D, 
                                     set_initial_excess_ice,
@@ -216,10 +219,68 @@ def column_to_grids(soilcolumn: SoilColumn,
                     par_3, par_4, output_file_name, output_title,
                     output_institution, output_summary, output_date,
                     grid_input_file_name, parameter_input_file_name)
+
+
+def nc_grid_to_column(nc_file_path: str) -> SoilColumn:
+    g = Grid(nc_file_path)
+    with nc.Dataset(nc_file_path, 'r') as ds:
+        materials = _materials_from_dataset(ds)
+    thicknesses = g.layer_thicknesses()[::-1]  # Reverse to get top to bottom
+    layers = []
     
+    for i, dz in enumerate(thicknesses):
+        layerdata = {}
+        
+        layerdata['freethaw::__layer_thickness'] = dz
+        
+        for dname in g.depth_names():
+            if dname in ['eta', 'z']:
+                continue  # Skip these depth variables. We only care about thickness
+            layerdata[f"freethaw::{dname}"] = g[dname][i]
+
+        layerdata["PARAMETERID"] = g['parameterID'][i]
+        layers.append(Layer(layerdata, metadata={"role_bindings": {"layer_thickness": "freethaw::__layer_thickness"}}))
+    
+    col = SoilColumn(layers[::-1])  # Reverse to get top to bottom
+    merged_col = col.merge_identical_layers(sum_props=['freethaw::volumeExcessIce', 
+                                                       'freethaw::volumeSoil', 
+                                                       'freethaw::__layer_thickness'])
+    for layer in merged_col.layers:
+        ei_ratio = float(layer['freethaw::volumeExcessIce'].value) / (float(layer['freethaw::volumeSoil'].value) + 
+                                                                      float(layer['freethaw::volumeExcessIce'].value))
+        layer.add_property(ei_ratio, "freethaw::EI_ratio")
+
+    for layer in merged_col.layers:
+        i = int(layer['PARAMETERID'].value)
+        for prop in materials[i].properties.values():
+            layer.add_property(prop)
+    import pdb;pdb.set_trace()
+    return merged_col
+
+
+def _materials_from_dataset(dataset: nc.Dataset) -> list[Material]:
+    materials = []
+    for i in range(len(dataset.dimensions['parameter'])):
+        material = _make_material(dataset, i)
+        materials.append(material)
+    return materials
+ 
+
+def _make_material(dataset: nc.Dataset, index: int) -> Material:
+    material_data = {}
+    for var in dataset.variables:
+        if len(dataset[var].dimensions) == 1 and dataset[var].dimensions[0] == 'parameter':  # 
+            prop_value = dataset.variables[var][index]
+            prop_name = f"freethaw::{var}"
+            prop_units = dataset.variables[var].units if 'units' in dataset.variables[var].ncattrs() else ""
+            material_data[prop_name] = Property(name=prop_name, value=prop_value, units=prop_units)
+            
+    return Material(data=material_data)
 
 
 if __name__ == "__main__":
+    nc_file_path = r"C:\Users\nicho\Downloads\deepGrid.nc"
+    nc_grid_to_column(nc_file_path)
     column = SampleColumn
     print(column_to_ic_csv(column))
     print(column_to_ratio_csv(column))

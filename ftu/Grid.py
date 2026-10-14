@@ -6,10 +6,15 @@ import matplotlib.pyplot as plt
 class Grid(object):
 
     def __init__(self, nc_grid_file):
-        """ Representation of FreeThaw grid files """
+        """ Representation of FreeThaw grid files 
+        eta : 
+        z : 
+        
+        """
         self.nc_grid_file = nc_grid_file
         self.nc = nc.Dataset(nc_grid_file, 'r')
         self.vi = self._valid_indices()
+        self.vii = self._valid_interface_indices()
         self._vars = {}
         self._build_vars()
 
@@ -38,6 +43,11 @@ class Grid(object):
 
     def _valid_indices(self):
         return (self.nc['z'][:] != 0).data
+
+    def _valid_interface_indices(self):
+        valid = self.nc['zDual'][:] != 0
+        valid[0] = True  # first zero is legit first interface
+        return valid.data
     
     @property
     def pid(self):
@@ -85,6 +95,14 @@ class Grid(object):
     def depth_names(self):
         V = [v for v in self.nc.variables if self.nc[v].dimensions in [('z',), ('k',)]]
         return V
+
+    def interface_names(self):
+        V = [v for v in self.nc.variables if self.nc[v].dimensions[0] == 'z_dual']
+        return V
+    
+    def layer_thicknesses(self):
+        """ Return the thickness of each layer in the grid. Ordered from bottom to top. """
+        return np.diff(self['etaDual'])  # should this be zDual?  
     
     def constant_names(self):
         dims = [d for d, v in self.nc.dimensions.items() if v.size == 1]
@@ -100,6 +118,9 @@ class Grid(object):
 
         for z in self.constant_names():
             self._vars[z] = self.nc[z][:]
+
+        for I in self.interface_names():
+            self._vars[I] = self.nc[I][:].data[self.vii]
     
     @property
     def vars(self):
