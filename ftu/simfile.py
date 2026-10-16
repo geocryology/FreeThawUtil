@@ -34,7 +34,7 @@ class Line:
         return self._text
 
     def value(self):
-        self.get('value')
+        return self.get('value')
     
     def get(self, key):
         return self._dict.get(key)
@@ -113,6 +113,9 @@ class FreeThawSim:
             L.set_variable(value)
             return
 
+    def get(self, key):
+        return resolve(self, key)
+    
     def get_variable_line(self, key):
         for L in self.lines:
             if key == L.get("key"):
