@@ -106,6 +106,9 @@ def column_to_ratio_csv(column: SoilColumn, interpolation: str = "step") -> pd.D
     else:
         raise ValueError("Column does not contain the necessary properties for calculating the ice-to-soil ratio.")
 
+    # Layers without excess ice properties have no excess ice (a NaN here becomes a NaN soil volume in the grid)
+    r = np.nan_to_num(r, nan=0.0)
+
     eta, r = layer_profile(column, r, interpolation)
 
     return pd.DataFrame({'eta': eta, 'EI_ratio': r})
@@ -267,7 +270,7 @@ def nc_grid_to_column(nc_file_path: str) -> SoilColumn:
     g = Grid(nc_file_path)
     with nc.Dataset(nc_file_path, 'r') as ds:
         materials = _materials_from_dataset(ds)
-    thicknesses = g.layer_thicknesses()[::-1]  # Reverse to get top to bottom
+    thicknesses = g.layer_thicknesses()  # Bottom to top, same order as the depth variables
     layers = []
     
     for i, dz in enumerate(thicknesses):
