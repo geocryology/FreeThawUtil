@@ -62,23 +62,41 @@ def get_layer_midpoints(column: SoilColumn) -> np.ndarray:
     
     return midpoints
 
-def column_to_ic_csv(column: SoilColumn) -> pd.DataFrame:
-    "Convert a SoilColumn object to a DataFrame containing the initial condition (ic) for each layer."
+# scipy interp1d `kind` that the grid creator must use for each interpolation mode
+INTERPOLATION_KINDS = {"step": "next", "linear": "linear"}
+
+
+def layer_profile(column: SoilColumn, values: np.ndarray, interpolation: str) -> tuple[np.ndarray, np.ndarray]:
+    """Build the (eta, value) points used to interpolate a per-layer property onto the grid.
+
+    'step':   a point at the top of each layer (plus the column bottom). With interp1d(kind='next')
+              each cell takes the value of the nearest point above it, so the value changes
+              exactly at layer boundaries.
+    'linear': a point at each layer midpoint (plus the surface and column bottom), so the value
+              varies linearly between layer midpoints.
+    """
     lb = get_lower_boundaries(column)
-    midpoints = get_layer_midpoints(column)
-    eta = np.concat([np.array([0]), midpoints, lb[-1:]]) 
-    
-    ic = column.extract('freethaw::ic')
-    ic = np.concat([ic[:1], ic, ic[-1:]])  
-    
+
+    if interpolation == "step":
+        eta = np.concat([np.array([0]), lb])
+        values = np.concat([values, values[-1:]])
+    elif interpolation == "linear":
+        eta = np.concat([np.array([0]), get_layer_midpoints(column), lb[-1:]])
+        values = np.concat([values[:1], values, values[-1:]])
+    else:
+        raise ValueError(f"interpolation must be one of {list(INTERPOLATION_KINDS)}, got {interpolation}")
+
+    return eta, values
+
+
+def column_to_ic_csv(column: SoilColumn, interpolation: str = "linear") -> pd.DataFrame:
+    "Convert a SoilColumn object to a DataFrame containing the initial condition (ic) for each layer."
+    eta, ic = layer_profile(column, column.extract('freethaw::ic'), interpolation)
+
     return pd.DataFrame({'eta': eta, 'T0': ic})
 
 
-def column_to_ratio_csv(column: SoilColumn) -> pd.DataFrame:
-    lb = get_lower_boundaries(column)
-    midpoints = get_layer_midpoints(column)
-    eta = np.concat([np.array([0]), midpoints, lb[-1:]])  
-
+def column_to_ratio_csv(column: SoilColumn, interpolation: str = "step") -> pd.DataFrame:
     if "freethaw::EI_ratio" in column.property_names:
         r = column.extract('freethaw::EI_ratio')
     elif "freethaw::volumeExcessIce" in column.property_names and "freethaw::volumeSoil" in column.property_names:
@@ -88,8 +106,8 @@ def column_to_ratio_csv(column: SoilColumn) -> pd.DataFrame:
     else:
         raise ValueError("Column does not contain the necessary properties for calculating the ice-to-soil ratio.")
 
-    r = np.concat([r[:1], r, r[-1:]])  
-    
+    eta, r = layer_profile(column, r, interpolation)
+
     return pd.DataFrame({'eta': eta, 'EI_ratio': r})
 
 
@@ -150,13 +168,21 @@ def column_to_grids(soilcolumn: SoilColumn,
                     dz_min:float=0.01,
                     b:float=0.01,
                     grid_type:str='exponential',
-                    defaults_if_missing=True):
+                    defaults_if_missing=True,
+                    ic_interpolation:str='linear',
+                    ei_interpolation:str='step'):
+    """ic_interpolation / ei_interpolation: 'step' keeps each layer's value constant with jumps at
+    layer boundaries; 'linear' interpolates between layer midpoints."""
     if defaults_if_missing:
         use_defaults_if_missing(soilcolumn, ['freethaw::par3', 'freethaw::par4'])
 
     if not grid_type in ['exponential', 'classical']:
         raise ValueError(f"grid_type must be either 'exponential' or 'classical', got {grid_type}")
-    
+
+    for interpolation in (ic_interpolation, ei_interpolation):
+        if interpolation not in INTERPOLATION_KINDS:
+            raise ValueError(f"interpolation must be one of {list(INTERPOLATION_KINDS)}, got {interpolation}")
+
     logger.info(f"Creating Grid: {name} in {create_files_in}")
     grid_input_file_name = str(Path(create_files_in) / f"{name}_grid.csv")
     parameter_input_file_name = str(Path(create_files_in) / f"{name}_parameter.csv")
@@ -174,12 +200,12 @@ def column_to_grids(soilcolumn: SoilColumn,
 
     size_factor = 5
 
-    interp_model_ic = "linear"
-    interp_model_EI_ratio = "next"
+    interp_model_ic = INTERPOLATION_KINDS[ic_interpolation]
+    interp_model_EI_ratio = INTERPOLATION_KINDS[ei_interpolation]
 
     data_grid = column_to_grid_csv(soilcolumn)
-    data_ic = column_to_ic_csv(soilcolumn)
-    data_EI_ratio = column_to_ratio_csv(soilcolumn)
+    data_ic = column_to_ic_csv(soilcolumn, ic_interpolation)
+    data_EI_ratio = column_to_ratio_csv(soilcolumn, ei_interpolation)
     data_parameter = column_to_parameter_csv(soilcolumn, drop_duplicates=True)
 
     data_grid.to_csv(grid_input_file_name, index=False)
