@@ -284,16 +284,14 @@ def nc_grid_to_column(nc_file_path: str) -> SoilColumn:
             layerdata[f"freethaw::{dname}"] = g[dname][i]
 
         layerdata["PARAMETERID"] = g['parameterID'][i]
+        # Per-cell ratio, so that only cells with the same excess ice ratio are merged below
+        layerdata["freethaw::EI_ratio"] = g['volumeExcessIce'][i] / (g['volumeExcessIce'][i] + g['volumeSoil'][i])
         layers.append(Layer(layerdata, metadata={"role_bindings": {"layer_thickness": "freethaw::__layer_thickness"}}))
-    
+
     col = SoilColumn(layers[::-1])  # Reverse to get top to bottom
-    merged_col = col.merge_identical_layers(sum_props=['freethaw::volumeExcessIce', 
-                                                       'freethaw::volumeSoil', 
+    merged_col = col.merge_identical_layers(sum_props=['freethaw::volumeExcessIce',
+                                                       'freethaw::volumeSoil',
                                                        'freethaw::__layer_thickness'])
-    for layer in merged_col.layers:
-        ei_ratio = float(layer['freethaw::volumeExcessIce'].value) / (float(layer['freethaw::volumeSoil'].value) + 
-                                                                      float(layer['freethaw::volumeExcessIce'].value))
-        layer.add_property(ei_ratio, "freethaw::EI_ratio")
 
     for layer in merged_col.layers:
         i = int(layer['PARAMETERID'].value)
