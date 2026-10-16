@@ -10,6 +10,7 @@ from ftu.grid import Grid
 logger = logging.getLogger(__name__)
 
 from groundmodel.core import SoilColumn, Layer, Material, Property
+from groundmodel.operations import use_defaults_if_missing
 from ftu.FreThaw1D_gridcreator import (write_grid_netCDF, 
                                     grid1D, 
                                     set_initial_excess_ice,
@@ -77,13 +78,13 @@ def column_to_ratio_csv(column: SoilColumn) -> pd.DataFrame:
     lb = get_lower_boundaries(column)
     midpoints = get_layer_midpoints(column)
     eta = np.concat([np.array([0]), midpoints, lb[-1:]])  
-    
-    if "freethaw::volumeExcessIce" in column.property_names and "freethaw::volumeSoil" in column.property_names:
+
+    if "freethaw::EI_ratio" in column.property_names:
+        r = column.extract('freethaw::EI_ratio')
+    elif "freethaw::volumeExcessIce" in column.property_names and "freethaw::volumeSoil" in column.property_names:
         eiv = column.extract('freethaw::volumeExcessIce')
         sv = column.extract('freethaw::volumeSoil')
         r = 1 / (1 + sv / eiv)
-    elif "freethaw::EI_ratio" in column.property_names:
-        r = column.extract('freethaw::EI_ratio') * np.nan
     else:
         raise ValueError("Column does not contain the necessary properties for calculating the ice-to-soil ratio.")
 
@@ -92,13 +93,13 @@ def column_to_ratio_csv(column: SoilColumn) -> pd.DataFrame:
     return pd.DataFrame({'eta': eta, 'EI_ratio': r})
 
 
-def column_to_parameter_csv(column: SoilColumn) -> pd.DataFrame:
+def column_to_parameter_csv(column: SoilColumn, drop_duplicates=True) -> pd.DataFrame:
     df = column.as_dataframe()
     df = df.rename(columns=lambda c: c.replace("freethaw::", ""))
     df = df.rename(columns=lambda c: c.replace("meltingTemperature", "meltingT"))
     df = df.rename(columns=lambda c: c.replace("specificThermalCapacity", "specificHeatCapacity"))
-    
-    return df.loc[:, ["density",
+
+    raw =  df.loc[:, ["density",
                       "thermalConductivity",
                       "specificHeatCapacity",
                       "thetaS",
@@ -109,6 +110,10 @@ def column_to_parameter_csv(column: SoilColumn) -> pd.DataFrame:
                       "par3",
                       "par4"]]
 
+    if drop_duplicates:
+        return raw.drop_duplicates().reset_index(drop=True)
+
+    return raw
 
 def column_to_grid_csv(column: SoilColumn) -> pd.DataFrame:
     """Convert a SoilColumn object to a DataFrame containing the grid data.
@@ -122,9 +127,13 @@ def column_to_grid_csv(column: SoilColumn) -> pd.DataFrame:
     
     eqnstate = column.extract('freethaw::equationStateID')
     eqnstate = np.concat([eqnstate.astype('str'), np.array(["nan"])]) 
-    
-    parameterid = np.arange(len(eta)).astype('str')
-    parameterid[-1] = "nan"
+
+    material = column_to_parameter_csv(column, drop_duplicates=False)
+    material["paramID"] = pd.factorize(material.apply(tuple, axis=1))[0]  # group unique parameterIDs
+    material['layerNumber'] = np.arange(len(material)).astype('str')
+
+    parameterid = material["paramID"].copy()
+    parameterid = pd.concat([parameterid, pd.Series([pd.NA])], ignore_index=True)
     
     return pd.DataFrame({"Type": "L",
                          'eta': eta,
@@ -140,14 +149,19 @@ def column_to_grids(soilcolumn: SoilColumn,
                     shallow_grid_depth:float=10,
                     dz_min:float=0.01,
                     b:float=0.01,
-                    grid_type:str='exponential'):
-    
+                    grid_type:str='exponential',
+                    defaults_if_missing=True):
+    if defaults_if_missing:
+        use_defaults_if_missing(soilcolumn, ['freethaw::par3', 'freethaw::par4'])
+
     if not grid_type in ['exponential', 'classical']:
         raise ValueError(f"grid_type must be either 'exponential' or 'classical', got {grid_type}")
     
     logger.info(f"Creating Grid: {name} in {create_files_in}")
     grid_input_file_name = str(Path(create_files_in) / f"{name}_grid.csv")
     parameter_input_file_name = str(Path(create_files_in) / f"{name}_parameter.csv")
+    ei_input_file_name = str(Path(create_files_in) / f"{name}_ei.csv")
+    ic_input_file_name = str(Path(create_files_in) / f"{name}_ic.csv")
     output_file_name =  str(Path(create_files_in) / "deepGrid.nc")
     output_file_name_shallow_grid = str(Path(create_files_in) / "shallowGrid.nc")
 
@@ -166,15 +180,17 @@ def column_to_grids(soilcolumn: SoilColumn,
     data_grid = column_to_grid_csv(soilcolumn)
     data_ic = column_to_ic_csv(soilcolumn)
     data_EI_ratio = column_to_ratio_csv(soilcolumn)
-    data_parameter = column_to_parameter_csv(soilcolumn)
+    data_parameter = column_to_parameter_csv(soilcolumn, drop_duplicates=True)
 
     data_grid.to_csv(grid_input_file_name, index=False)
-    data_ic.to_csv(parameter_input_file_name, index=False)
-    data_EI_ratio.to_csv(parameter_input_file_name, index=False)
+    data_ic.to_csv(ic_input_file_name, index=False)
+    data_EI_ratio.to_csv(ei_input_file_name, index=False)
     data_parameter.to_csv(parameter_input_file_name, index=False)
    
     data_regrid = pd.read_csv(regrid_input_file_name)
-
+   # print(data_parameter)
+    #print(data_grid)
+    #import pdb;pdb.set_trace()
     [KMAX, VECTOR_LENGTH, eta, eta_dual, space_delta, z, z_dual, control_volume] = grid1D(data_grid, dz_min, b, grid_type, size_factor=size_factor)
     logger.info(f"KMAX={KMAX}, VEC_LEN={VECTOR_LENGTH}")
 
@@ -254,7 +270,7 @@ def nc_grid_to_column(nc_file_path: str) -> SoilColumn:
         i = int(layer['PARAMETERID'].value)
         for prop in materials[i].properties.values():
             layer.add_property(prop)
-    import pdb;pdb.set_trace()
+
     return merged_col
 
 
